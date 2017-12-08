@@ -117,6 +117,17 @@ type UpdateResponse struct {
 	Message string
 }
 
+// CleanupArgs ... args for Cleanup method
+type CleanupArgs struct {
+	Types []string
+}
+
+// CleanupResponse ... JSON-RPC response for Cleanup method
+type CleanupResponse struct {
+	Error   string
+	Deleted int
+}
+
 // Add ... add entry to DB
 func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) error {
 	entryType := args.Type
@@ -277,6 +288,23 @@ func (s *EntryService) Update(r *http.Request, args *UpdateEntryArgs, result *Up
 		return nil
 	}
 	result.Message = "No UUID found, cannot proceed with updating"
+	return nil
+}
+
+// Cleanup ... Cleanup DB
+func (s *EntryService) Cleanup(r *http.Request, args *CleanupArgs, result *CleanupResponse) error {
+	entryTypes := []string{EntryTypePim, EntryTypeBookmark, EntryTypeOrg}
+	if len(args.Types) > 0 {
+		entryTypes = args.Types
+	}
+	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	changed, err := coll.RemoveAll(bson.M{"type": bson.M{"$in": entryTypes}})
+	if err != nil {
+		result.Error = fmt.Sprintf("cleanup failed: %s", err)
+		result.Deleted = 0
+		return nil
+	}
+	result.Deleted = changed.Removed
 	return nil
 }
 
