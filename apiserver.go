@@ -100,6 +100,23 @@ type AddResponse struct {
 	Message string
 }
 
+// UpdateEntryArgs ... args for UpdateEntry method
+type UpdateEntryArgs struct {
+	UUID       string
+	Type       string
+	Content    string
+	Tags       []string
+	Scheduled  string
+	Deadline   string
+	Priority   string
+	TodoStatus string
+}
+
+// UpdateResponse ... JSON-RPC response for Update method
+type UpdateResponse struct {
+	Message string
+}
+
 // Add ... add entry to DB
 func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) error {
 	entryType := args.Type
@@ -189,6 +206,77 @@ func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddRespo
 		return nil
 	}
 	result.Message = "Already exists, skipping"
+	return nil
+}
+
+// Update ... Update entry in DB
+func (s *EntryService) Update(r *http.Request, args *UpdateEntryArgs, result *UpdateResponse) error {
+	// Since there is no fixed data schema, we can update as we like, so be careful
+	uuid := args.UUID
+	if uuid != "" {
+		coll := s.session.DB(MentatDatabase).C(MentatCollection)
+		entry := Entry{}
+		mgoErr := coll.Find(bson.M{"uuid": uuid}).One(&entry)
+		if mgoErr != nil {
+			if mgoErr.Error() == mongoNotFound {
+				result.Message = "No entry with provided UUID"
+				return nil
+			}
+			s.log.Infof("mgo error: %s", mgoErr)
+			result.Message = fmt.Sprintf("mgo error: %s", mgoErr)
+			return nil
+		}
+		// TODO: maybe use reflection
+		if args.Type != "" {
+			entry.Type = args.Type
+		}
+		if args.Content != "" {
+			entry.Content = args.Content
+		}
+		if len(args.Tags) > 0 {
+			entry.Tags = args.Tags
+		}
+		if args.Scheduled != "" {
+			scheduled, err := time.Parse(DatetimeLayout, args.Scheduled)
+			if err != nil {
+				return err
+			}
+			entry.Scheduled = scheduled
+		}
+		if args.Deadline != "" {
+			deadline, err := time.Parse(DatetimeLayout, args.Deadline)
+			if err != nil {
+				return err
+			}
+			entry.Deadline = deadline
+		}
+
+		if args.Priority != "" {
+			rexp, err := regexp.Compile("\\#[A-Z]$")
+			if err != nil {
+				panic(err) // sentinel, should fail, because such error is predictable
+			}
+			if rexp.Match([]byte(args.Priority)) {
+				entry.Priority = args.Priority
+			} else {
+				result.Message = "Malformed priority value"
+				return nil
+			}
+		}
+
+		if args.TodoStatus != "" {
+			entry.TodoStatus = strings.ToUpper(args.TodoStatus)
+		}
+		entry.ModifiedAt = time.Now()
+		_, err := coll.Upsert(bson.M{"uuid": uuid}, entry)
+		if err != nil {
+			result.Message = fmt.Sprintf("update failed: %s", err)
+			return nil
+		}
+		result.Message = "updated"
+		return nil
+	}
+	result.Message = "No UUID found, cannot proceed with updating"
 	return nil
 }
 
