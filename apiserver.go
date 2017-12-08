@@ -54,6 +54,7 @@ const (
 	MentatDatabase   = "mentat-database"
 	MentatCollection = "mentat-entries"
 	DatetimeLayout   = "0000-00-00T00:00:00.000Z" // TODO: maybe use appropriate constant from "time" module
+	mongoNotFound    = "not found"
 )
 
 // EntryService ... Entries RPC service
@@ -119,71 +120,70 @@ func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddRespo
 
 	entry := Entry{}
 	mgoErr := coll.Find(bson.M{"content": content}).One(&entry)
-	if (mgoErr != nil) && (mgoErr.Error() != "not found") {
-		s.log.Infof("mgo error: %s", mgoErr)
-		result.Message = fmt.Sprintf("mgo error: %s", mgoErr)
-		return nil
-	}
+	if mgoErr != nil {
+		if mgoErr.Error() == mongoNotFound {
+			entry.Content = content
+			tags := args.Tags
+			if len(tags) > 0 {
+				var lowerTags []string
+				for _, tag := range tags {
+					lowerTags = append(lowerTags, strings.ToLower(tag))
+				}
+				tags := lowerTags
+				entry.Tags = tags
+			}
+			if args.Scheduled != "" {
+				scheduled, err := time.Parse(DatetimeLayout, args.Scheduled)
+				if err != nil {
+					return err
+				}
+				entry.Scheduled = scheduled
+			}
+			if args.Deadline != "" {
+				deadline, err := time.Parse(DatetimeLayout, args.Deadline)
+				if err != nil {
+					return err
+				}
+				entry.Deadline = deadline
+			}
 
-	if mgoErr.Error() == "not found" {
-		entry.Content = content
-		tags := args.Tags
-		if len(tags) > 0 {
-			var lowerTags []string
-			for _, tag := range tags {
-				lowerTags = append(lowerTags, strings.ToLower(tag))
-			}
-			tags := lowerTags
-			entry.Tags = tags
-		}
-		if args.Scheduled != "" {
-			scheduled, err := time.Parse(DatetimeLayout, args.Scheduled)
-			if err != nil {
-				return err
-			}
-			entry.Scheduled = scheduled
-		}
-		if args.Deadline != "" {
-			deadline, err := time.Parse(DatetimeLayout, args.Deadline)
-			if err != nil {
-				return err
-			}
-			entry.Deadline = deadline
-		}
+			now := time.Now()
+			entry.AddedAt = now
+			entry.ModifiedAt = now
 
-		now := time.Now()
-		entry.AddedAt = now
-		entry.ModifiedAt = now
-
-		if args.Priority != "" {
-			rexp, err := regexp.Compile("\\#[A-Z]$")
-			if err != nil {
-				panic(err) // sentinel, should fail, because such error is predictable
+			if args.Priority != "" {
+				rexp, err := regexp.Compile("\\#[A-Z]$")
+				if err != nil {
+					panic(err) // sentinel, should fail, because such error is predictable
+				}
+				if rexp.Match([]byte(args.Priority)) {
+					entry.Priority = args.Priority
+				} else {
+					result.Message = "Malformed priority value"
+					return nil
+				}
 			}
-			if rexp.Match([]byte(args.Priority)) {
-				entry.Priority = args.Priority
-			} else {
-				result.Message = "Malformed priority value"
+
+			if args.TodoStatus != "" {
+				entry.TodoStatus = strings.ToUpper(args.TodoStatus)
+			}
+
+			if (PostMetadata{}) != args.Metadata {
+				entry.Metadata = args.Metadata
+			}
+
+			entry.UUID = uuid.NewV4().String()
+			mgoErr = coll.Insert(&entry)
+			if mgoErr != nil {
+				s.log.Infof("failed to insert entry: %s", mgoErr.Error())
+				result.Message = fmt.Sprintf("failed to insert entry: %s", mgoErr.Error())
 				return nil
 			}
-		}
-
-		if args.TodoStatus != "" {
-			entry.TodoStatus = strings.ToUpper(args.TodoStatus)
-		}
-
-		if (PostMetadata{}) != args.Metadata {
-			entry.Metadata = args.Metadata
-		}
-
-		entry.UUID = uuid.NewV4().String()
-		mgoErr = coll.Insert(&entry)
-		if mgoErr != nil {
-			s.log.Infof("failed to insert entry: %s", mgoErr.Error())
-			result.Message = fmt.Sprintf("failed to insert entry: %s", mgoErr.Error())
+			result.Message = entry.UUID
 			return nil
 		}
-		result.Message = entry.UUID
+		s.log.Infof("mgo error: %s", mgoErr)
+		result.Message = fmt.Sprintf("mgo error: %s", mgoErr)
 		return nil
 	}
 	result.Message = "Already exists, skipping"
