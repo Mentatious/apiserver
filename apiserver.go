@@ -31,6 +31,7 @@ type PostMetadata struct {
 // Entry ... db representation
 type Entry struct {
 	Content    string
+	Type       string
 	Tags       []string
 	Scheduled  time.Time
 	Deadline   time.Time
@@ -122,6 +123,7 @@ func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddRespo
 	mgoErr := coll.Find(bson.M{"content": content}).One(&entry)
 	if mgoErr != nil {
 		if mgoErr.Error() == mongoNotFound {
+			entry.Type = args.Type
 			entry.Content = content
 			tags := args.Tags
 			if len(tags) > 0 {
