@@ -55,7 +55,7 @@ const (
 	MentatDatabase   = "mentat-database"
 	MentatCollection = "mentat-entries"
 	DatetimeLayout   = "0000-00-00T00:00:00.000Z" // TODO: maybe use appropriate constant from "time" module
-	mongoNotFound    = "not found"
+	MongoNotFound    = "not found"
 )
 
 // EntryService ... Entries RPC service
@@ -164,7 +164,7 @@ func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddRespo
 	entry := Entry{}
 	mgoErr := coll.Find(bson.M{"content": content}).One(&entry)
 	if mgoErr != nil {
-		if mgoErr.Error() == mongoNotFound {
+		if mgoErr.Error() == MongoNotFound {
 			entry.Type = args.Type
 			entry.Content = content
 			tags := args.Tags
@@ -243,7 +243,7 @@ func (s *EntryService) Update(r *http.Request, args *UpdateEntryArgs, result *Up
 		entry := Entry{}
 		mgoErr := coll.Find(bson.M{"uuid": uuid}).One(&entry)
 		if mgoErr != nil {
-			if mgoErr.Error() == mongoNotFound {
+			if mgoErr.Error() == MongoNotFound {
 				result.Message = "No entry with provided UUID"
 				return nil
 			}
