@@ -128,6 +128,20 @@ type CleanupResponse struct {
 	Deleted int
 }
 
+// StatsArgs ... args for Stats method
+type StatsArgs struct {
+	Detailed bool
+}
+
+// StatsResponse ... JSON-RPC response for Stats method
+type StatsResponse struct {
+	Error     string
+	Whole     int
+	Bookmarks int
+	Pim       int
+	Org       int
+}
+
 // Add ... add entry to DB
 func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) error {
 	entryType := args.Type
@@ -308,6 +322,42 @@ func (s *EntryService) Cleanup(r *http.Request, args *CleanupArgs, result *Clean
 	return nil
 }
 
+// Stats ... Show DB stats (overall and type-wise entries count)
+func (s *EntryService) Stats(r *http.Request, args *StatsArgs, result *StatsResponse) error {
+	result.Whole = -1
+	result.Bookmarks = -1
+	result.Pim = -1
+	result.Org = -1
+	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	wholeCount, err := coll.Count()
+	if err != nil {
+		result.Error = fmt.Sprintf("failed getting stats/whole count: %s", err)
+		return nil
+	}
+	result.Whole = wholeCount
+	if args.Detailed {
+		var entries []Entry
+		err := coll.Find(bson.M{"type": "bookmark"}).All(&entries)
+		if err != nil {
+			result.Error = fmt.Sprintf("failed getting stats/bookmarks count: %s", err)
+			return nil
+		}
+		result.Bookmarks = len(entries)
+		err = coll.Find(bson.M{"type": "pim"}).All(&entries)
+		if err != nil {
+			result.Error = fmt.Sprintf("failed getting stats/pim count: %s", err)
+			return nil
+		}
+		result.Pim = len(entries)
+		err = coll.Find(bson.M{"type": "org"}).All(&entries)
+		if err != nil {
+			result.Error = fmt.Sprintf("failed getting stats/org count: %s", err)
+			return nil
+		}
+		result.Org = len(entries)
+	}
+	return nil
+}
 // InitLogging ... Initialize loggers
 func InitLogging(debug bool, showLoc bool) (*zap.Logger, *zap.SugaredLogger) {
 	var rawlog *zap.Logger
