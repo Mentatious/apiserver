@@ -52,10 +52,11 @@ const (
 
 // Mentat DB traits
 const (
-	MentatDatabase   = "mentat-database"
-	MentatCollection = "mentat-entries"
-	DatetimeLayout   = "0000-00-00T00:00:00.000Z" // TODO: maybe use appropriate constant from "time" module
-	MongoNotFound    = "not found"
+	MentatDatabase       = "mentat-database"
+	MentatCollection     = "mentat-entries"
+	DatetimeLayout       = "0000-00-00T00:00:00.000Z" // TODO: maybe use appropriate constant from "time" module
+	MongoNotFound        = "not found"
+	BatchDeleteThreshold = 10 // if we delete more than this amount of records, use batch removal mode
 )
 
 // EntryService ... Entries RPC service
@@ -140,6 +141,17 @@ type StatsResponse struct {
 	Bookmarks int
 	Pim       int
 	Org       int
+}
+
+// DeleteEntryArgs ... args for DeleteEntry method
+type DeleteEntryArgs struct {
+	UUIDs []string
+}
+
+// DeleteResponse ... JSON-RPC response for Delete method
+type DeleteResponse struct {
+	Error   string
+	Deleted int
 }
 
 // Add ... add entry to DB
@@ -356,6 +368,42 @@ func (s *EntryService) Stats(r *http.Request, args *StatsArgs, result *StatsResp
 		}
 		result.Org = len(entries)
 	}
+	return nil
+}
+
+// Delete ... Remove 1+ selected entries
+func (s *EntryService) Delete(r *http.Request, args *DeleteEntryArgs, result *DeleteResponse) error {
+	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	UUIDsToDelete := args.UUIDs
+	if len(UUIDsToDelete) > 0 {
+		if len(UUIDsToDelete) > BatchDeleteThreshold {
+			changed, err := coll.RemoveAll(bson.M{"type": bson.M{"$in": args.UUIDs}})
+			if err != nil {
+				result.Error = fmt.Sprintf("cleanup failed: %s", err)
+				result.Deleted = -1
+				return nil
+			}
+			result.Deleted = changed.Removed
+			return nil
+		}
+		deletedCount := 0
+		var failedEntries []string
+		for _, uuid := range UUIDsToDelete {
+			err := coll.Remove(bson.M{"uuid": uuid})
+			if err == nil {
+				deletedCount++
+			} else {
+				failedEntries = append(failedEntries, uuid)
+			}
+		}
+		if len(failedEntries) > 0 {
+			result.Error = fmt.Sprintf("failed to delete entries: %s", strings.Join(failedEntries, ", "))
+		}
+		result.Deleted = deletedCount
+		return nil
+	}
+	result.Error = "No UUIDs provided"
+	result.Deleted = -1
 	return nil
 }
 // InitLogging ... Initialize loggers
