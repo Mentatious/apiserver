@@ -50,6 +50,7 @@ const (
 	EntryTypeOrg      = "org"
 )
 
+// TODO: move [some of these] to config storage (file/whatever)
 // Mentat DB traits
 const (
 	MentatDatabase       = "mentat-database"
