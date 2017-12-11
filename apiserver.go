@@ -85,7 +85,7 @@ func (s *EntryService) Destroy() {
 	s.session.Close()
 }
 
-// AddEntryArgs ... args for AddEntry method
+// AddEntryArgs ... args for Add method
 type AddEntryArgs struct {
 	Type       string
 	Content    string
@@ -102,7 +102,7 @@ type AddResponse struct {
 	Message string
 }
 
-// UpdateEntryArgs ... args for UpdateEntry method
+// UpdateEntryArgs ... args for Update method
 type UpdateEntryArgs struct {
 	UUID       string
 	Type       string
@@ -144,7 +144,7 @@ type StatsResponse struct {
 	Org       int
 }
 
-// DeleteEntryArgs ... args for DeleteEntry method
+// DeleteEntryArgs ... args for Delete method
 type DeleteEntryArgs struct {
 	UUIDs []string
 }
