@@ -155,6 +155,21 @@ type DeleteResponse struct {
 	Deleted int
 }
 
+// SearchEntryArgs ... args for Search method
+type SearchEntryArgs struct {
+	Types    []string
+	Content  string
+	Tags     []string
+	Priority string
+}
+
+// SearchResponse ... JSON-RPC response for Search method
+type SearchResponse struct {
+	Error   string
+	Count   int
+	Entries []Entry
+}
+
 // Add ... add entry to DB
 func (s *EntryService) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) error {
 	entryType := args.Type
@@ -407,6 +422,54 @@ func (s *EntryService) Delete(r *http.Request, args *DeleteEntryArgs, result *De
 	result.Deleted = -1
 	return nil
 }
+
+// Search ... Search entries
+func (s *EntryService) Search(r *http.Request, args *SearchEntryArgs, result *SearchResponse) error {
+	// TODO: add metadata searching
+	// TODO: add fuzzy tags searching
+	var searchClauses []bson.M
+	var searchQuery bson.M
+	var entries []Entry
+	entryTypes := []string{EntryTypePim, EntryTypeBookmark, EntryTypeOrg}
+	if len(args.Types) > 0 {
+		entryTypes = args.Types
+	}
+	var entryTypesClauses []bson.M
+	for _, entryType := range entryTypes {
+		entryTypesClauses = append(entryTypesClauses, bson.M{"type": entryType})
+	}
+	searchClauses = append(searchClauses, bson.M{"$or": entryTypesClauses})
+	if args.Content != "" {
+		searchClauses = append(searchClauses, bson.M{"content": bson.M{"$regex": args.Content, "$options": "i"}})
+	}
+	if len(args.Tags) > 0 {
+		searchClauses = append(searchClauses, bson.M{"tags": bson.M{"$in": args.Tags}})
+	}
+	if args.Priority != "" {
+		searchClauses = append(searchClauses, bson.M{"priority": args.Priority})
+	}
+	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	if len(searchClauses) > 0 {
+		searchQuery = bson.M{"$and": searchClauses}
+	}
+	mgoErr := coll.Find(searchQuery).All(&entries)
+	if mgoErr != nil {
+		if mgoErr.Error() == MongoNotFound {
+			result.Entries = []Entry{}
+			result.Count = 0
+			return nil
+		}
+		s.log.Infof("mgo error: %s", mgoErr)
+		result.Error = fmt.Sprintf("mgo error: %s", mgoErr)
+		result.Entries = []Entry{}
+		result.Count = 0
+		return nil
+	}
+	result.Entries = entries
+	result.Count = len(entries)
+	return nil
+}
+
 // InitLogging ... Initialize loggers
 func InitLogging(debug bool, showLoc bool) (*zap.Logger, *zap.SugaredLogger) {
 	var rawlog *zap.Logger
