@@ -16,7 +16,7 @@ import (
 // Init ... initialize EntryService
 func (s *Service) Init(dbhost string, log *zap.SugaredLogger) {
 	s.log = log
-	s.log.Infof("Initializing EntryService...")
+	s.log.Infof("Initializing 'entry' service...")
 	session, err := mgo.Dial(dbhost)
 	if err != nil {
 		fmt.Printf("%s, exiting...\n", err)
