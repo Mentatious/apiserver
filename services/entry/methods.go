@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -18,7 +19,8 @@ func (s *Service) Init(dbhost string, log *zap.SugaredLogger) {
 	s.log.Infof("Initializing EntryService...")
 	session, err := mgo.Dial(dbhost)
 	if err != nil {
-		panic(err)
+		fmt.Printf("%s, exiting...\n", err)
+		os.Exit(1)
 	}
 	s.session = session
 	s.session.SetMode(mgo.Monotonic, true)
