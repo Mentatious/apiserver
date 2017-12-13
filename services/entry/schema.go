@@ -56,6 +56,7 @@ const (
 
 // AddEntryArgs ... args for Add method
 type AddEntryArgs struct {
+	UserID     string
 	Type       string
 	Content    string
 	Tags       []string
@@ -73,6 +74,7 @@ type AddResponse struct {
 
 // UpdateEntryArgs ... args for Update method
 type UpdateEntryArgs struct {
+	UserID     string
 	UUID       string
 	Type       string
 	Content    string
@@ -90,7 +92,8 @@ type UpdateResponse struct {
 
 // CleanupArgs ... args for Cleanup method
 type CleanupArgs struct {
-	Types []string
+	UserID string
+	Types  []string
 }
 
 // CleanupResponse ... JSON-RPC response for Cleanup method
@@ -101,6 +104,7 @@ type CleanupResponse struct {
 
 // StatsArgs ... args for Stats method
 type StatsArgs struct {
+	UserID   string
 	Detailed bool
 }
 
@@ -115,7 +119,8 @@ type StatsResponse struct {
 
 // DeleteEntryArgs ... args for Delete method
 type DeleteEntryArgs struct {
-	UUIDs []string
+	UserID string
+	UUIDs  []string
 }
 
 // DeleteResponse ... JSON-RPC response for Delete method
@@ -126,6 +131,7 @@ type DeleteResponse struct {
 
 // SearchEntryArgs ... args for Search method
 type SearchEntryArgs struct {
+	UserID   string
 	Types    []string
 	Content  string
 	Tags     []string

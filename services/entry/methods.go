@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+const (
+	uidMissing = "User ID is missing"
+)
+
 // Init ... initialize EntryService
 func (s *Service) Init(dbhost string, log *zap.SugaredLogger) {
 	s.log = log
@@ -34,6 +38,10 @@ func (s *Service) Destroy() {
 
 // Add ... add entry to DB
 func (s *Service) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) error {
+	if args.UserID == "" {
+		result.Message = uidMissing
+		return nil
+	}
 	entryType := args.Type
 	if entryType == "" {
 		result.Message = "Entry type is missing"
@@ -49,7 +57,7 @@ func (s *Service) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) 
 	}
 	s.log.Infof("received '%s' entry: '%s'", entryType, content)
 
-	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	coll := s.session.DB(MentatDatabase).C(args.UserID)
 
 	entry := Entry{}
 	mgoErr := coll.Find(bson.M{"content": content}).One(&entry)
@@ -127,9 +135,13 @@ func (s *Service) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) 
 // Update ... Update entry in DB
 func (s *Service) Update(r *http.Request, args *UpdateEntryArgs, result *UpdateResponse) error {
 	// Since there is no fixed data schema, we can update as we like, so be careful
+	if args.UserID == "" {
+		result.Message = uidMissing
+		return nil
+	}
 	uuid := args.UUID
 	if uuid != "" {
-		coll := s.session.DB(MentatDatabase).C(MentatCollection)
+		coll := s.session.DB(MentatDatabase).C(args.UserID)
 		entry := Entry{}
 		mgoErr := coll.Find(bson.M{"uuid": uuid}).One(&entry)
 		if mgoErr != nil {
@@ -197,11 +209,16 @@ func (s *Service) Update(r *http.Request, args *UpdateEntryArgs, result *UpdateR
 
 // Cleanup ... Cleanup DB
 func (s *Service) Cleanup(r *http.Request, args *CleanupArgs, result *CleanupResponse) error {
+	if args.UserID == "" {
+		result.Error = uidMissing
+		result.Deleted = 0
+		return nil
+	}
 	entryTypes := []string{EntryTypePim, EntryTypeBookmark, EntryTypeOrg}
 	if len(args.Types) > 0 {
 		entryTypes = args.Types
 	}
-	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	coll := s.session.DB(MentatDatabase).C(args.UserID)
 	changed, err := coll.RemoveAll(bson.M{"type": bson.M{"$in": entryTypes}})
 	if err != nil {
 		result.Error = fmt.Sprintf("cleanup failed: %s", err)
@@ -214,11 +231,15 @@ func (s *Service) Cleanup(r *http.Request, args *CleanupArgs, result *CleanupRes
 
 // Stats ... Show DB stats (overall and type-wise entries count)
 func (s *Service) Stats(r *http.Request, args *StatsArgs, result *StatsResponse) error {
+	if args.UserID == "" {
+		result.Error = uidMissing
+		return nil
+	}
 	result.Whole = -1
 	result.Bookmarks = -1
 	result.Pim = -1
 	result.Org = -1
-	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	coll := s.session.DB(MentatDatabase).C(args.UserID)
 	wholeCount, err := coll.Count()
 	if err != nil {
 		result.Error = fmt.Sprintf("failed getting stats/whole count: %s", err)
@@ -251,7 +272,12 @@ func (s *Service) Stats(r *http.Request, args *StatsArgs, result *StatsResponse)
 
 // Delete ... Remove 1+ selected entries
 func (s *Service) Delete(r *http.Request, args *DeleteEntryArgs, result *DeleteResponse) error {
-	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	if args.UserID == "" {
+		result.Error = uidMissing
+		result.Deleted = -1
+		return nil
+	}
+	coll := s.session.DB(MentatDatabase).C(args.UserID)
 	UUIDsToDelete := args.UUIDs
 	if len(UUIDsToDelete) > 0 {
 		if len(UUIDsToDelete) > BatchDeleteThreshold {
@@ -289,6 +315,12 @@ func (s *Service) Delete(r *http.Request, args *DeleteEntryArgs, result *DeleteR
 func (s *Service) Search(r *http.Request, args *SearchEntryArgs, result *SearchResponse) error {
 	// TODO: add metadata searching
 	// TODO: add fuzzy tags searching
+	if args.UserID == "" {
+		result.Error = uidMissing
+		result.Entries = []Entry{}
+		result.Count = 0
+		return nil
+	}
 	var searchClauses []bson.M
 	var searchQuery bson.M
 	var entries []Entry
@@ -310,7 +342,7 @@ func (s *Service) Search(r *http.Request, args *SearchEntryArgs, result *SearchR
 	if args.Priority != "" {
 		searchClauses = append(searchClauses, bson.M{"priority": args.Priority})
 	}
-	coll := s.session.DB(MentatDatabase).C(MentatCollection)
+	coll := s.session.DB(MentatDatabase).C(args.UserID)
 	if len(searchClauses) > 0 {
 		searchQuery = bson.M{"$and": searchClauses}
 	}
