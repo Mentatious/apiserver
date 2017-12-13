@@ -7,35 +7,15 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"github.com/simonleung8/flags"
-	"go.uber.org/zap"
+	"github.com/wiedzmin/goodies"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-// InitLogging ... Initialize loggers
-func InitLogging(debug bool, showLoc bool) (*zap.Logger, *zap.SugaredLogger) {
-	var rawlog *zap.Logger
-	var log *zap.SugaredLogger
-	var cfg zap.Config
-	var err error
-	if debug {
-		cfg = zap.NewDevelopmentConfig()
-	} else {
-		cfg = zap.NewProductionConfig()
-	}
-	cfg.DisableCaller = !showLoc
-	rawlog, err = cfg.Build()
-	if err != nil {
-		panic(err)
-	}
-	log = rawlog.Sugar()
-	return rawlog, log
-}
-
 func main() {
-	_, log := InitLogging(false, false)
+	_, log := goodies.InitLogging(false, false)
 
 	fc := flags.New()
 	fc.NewStringFlag("host", "h", "host to listen")
