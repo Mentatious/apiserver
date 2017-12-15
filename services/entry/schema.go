@@ -1,8 +1,7 @@
 package entry
 
 import (
-	"go.uber.org/zap"
-	"gopkg.in/mgo.v2"
+	"github.com/Mentatious/mentat-apiserver/services"
 	"time"
 )
 
@@ -18,9 +17,7 @@ const (
 
 // Service ... Entries RPC service
 type Service struct {
-	DBHost  string
-	log     *zap.SugaredLogger
-	session *mgo.Session
+	services.BaseService
 }
 
 // PostMetadata ... metadata for post

@@ -3,11 +3,8 @@ package entry
 import (
 	"fmt"
 	"github.com/satori/go.uuid"
-	"go.uber.org/zap"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -16,25 +13,6 @@ import (
 const (
 	uidMissing = "User ID is missing"
 )
-
-// Init ... initialize EntryService
-func (s *Service) Init(dbhost string, log *zap.SugaredLogger) {
-	s.log = log
-	s.log.Infof("Initializing 'entry' service...")
-	session, err := mgo.Dial(dbhost)
-	if err != nil {
-		fmt.Printf("%s, exiting...\n", err)
-		os.Exit(1)
-	}
-	s.session = session
-	s.session.SetMode(mgo.Monotonic, true)
-}
-
-// Destroy ... destroy EntryService instance
-func (s *Service) Destroy() {
-	s.log.Infof("Destroying EntryService...")
-	s.session.Close()
-}
 
 // Add ... add entry to DB
 func (s *Service) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) error {
@@ -55,9 +33,9 @@ func (s *Service) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) 
 		result.Message = "Empty content not allowed"
 		return nil
 	}
-	s.log.Infof("received '%s' entry: '%s'", entryType, content)
+	s.Log.Infof("received '%s' entry: '%s'", entryType, content)
 
-	coll := s.session.DB(MentatDatabase).C(args.UserID)
+	coll := s.Session.DB(MentatDatabase).C(args.UserID)
 
 	entry := Entry{}
 	mgoErr := coll.Find(bson.M{"content": content}).One(&entry)
@@ -117,14 +95,14 @@ func (s *Service) Add(r *http.Request, args *AddEntryArgs, result *AddResponse) 
 			entry.UUID = uuid.NewV4().String()
 			mgoErr = coll.Insert(&entry)
 			if mgoErr != nil {
-				s.log.Infof("failed to insert entry: %s", mgoErr.Error())
+				s.Log.Infof("failed to insert entry: %s", mgoErr.Error())
 				result.Message = fmt.Sprintf("failed to insert entry: %s", mgoErr.Error())
 				return nil
 			}
 			result.Message = entry.UUID
 			return nil
 		}
-		s.log.Infof("mgo error: %s", mgoErr)
+		s.Log.Infof("mgo error: %s", mgoErr)
 		result.Message = fmt.Sprintf("mgo error: %s", mgoErr)
 		return nil
 	}
@@ -141,7 +119,7 @@ func (s *Service) Update(r *http.Request, args *UpdateEntryArgs, result *UpdateR
 	}
 	uuid := args.UUID
 	if uuid != "" {
-		coll := s.session.DB(MentatDatabase).C(args.UserID)
+		coll := s.Session.DB(MentatDatabase).C(args.UserID)
 		entry := Entry{}
 		mgoErr := coll.Find(bson.M{"uuid": uuid}).One(&entry)
 		if mgoErr != nil {
@@ -149,7 +127,7 @@ func (s *Service) Update(r *http.Request, args *UpdateEntryArgs, result *UpdateR
 				result.Message = "No entry with provided UUID"
 				return nil
 			}
-			s.log.Infof("mgo error: %s", mgoErr)
+			s.Log.Infof("mgo error: %s", mgoErr)
 			result.Message = fmt.Sprintf("mgo error: %s", mgoErr)
 			return nil
 		}
@@ -218,7 +196,7 @@ func (s *Service) Cleanup(r *http.Request, args *CleanupArgs, result *CleanupRes
 	if len(args.Types) > 0 {
 		entryTypes = args.Types
 	}
-	coll := s.session.DB(MentatDatabase).C(args.UserID)
+	coll := s.Session.DB(MentatDatabase).C(args.UserID)
 	changed, err := coll.RemoveAll(bson.M{"type": bson.M{"$in": entryTypes}})
 	if err != nil {
 		result.Error = fmt.Sprintf("cleanup failed: %s", err)
@@ -239,7 +217,7 @@ func (s *Service) Stats(r *http.Request, args *StatsArgs, result *StatsResponse)
 	result.Bookmarks = -1
 	result.Pim = -1
 	result.Org = -1
-	coll := s.session.DB(MentatDatabase).C(args.UserID)
+	coll := s.Session.DB(MentatDatabase).C(args.UserID)
 	wholeCount, err := coll.Count()
 	if err != nil {
 		result.Error = fmt.Sprintf("failed getting stats/whole count: %s", err)
@@ -277,7 +255,7 @@ func (s *Service) Delete(r *http.Request, args *DeleteEntryArgs, result *DeleteR
 		result.Deleted = -1
 		return nil
 	}
-	coll := s.session.DB(MentatDatabase).C(args.UserID)
+	coll := s.Session.DB(MentatDatabase).C(args.UserID)
 	UUIDsToDelete := args.UUIDs
 	if len(UUIDsToDelete) > 0 {
 		if len(UUIDsToDelete) > BatchDeleteThreshold {
@@ -342,7 +320,7 @@ func (s *Service) Search(r *http.Request, args *SearchEntryArgs, result *SearchR
 	if args.Priority != "" {
 		searchClauses = append(searchClauses, bson.M{"priority": args.Priority})
 	}
-	coll := s.session.DB(MentatDatabase).C(args.UserID)
+	coll := s.Session.DB(MentatDatabase).C(args.UserID)
 	if len(searchClauses) > 0 {
 		searchQuery = bson.M{"$and": searchClauses}
 	}
@@ -353,7 +331,7 @@ func (s *Service) Search(r *http.Request, args *SearchEntryArgs, result *SearchR
 			result.Count = 0
 			return nil
 		}
-		s.log.Infof("mgo error: %s", mgoErr)
+		s.Log.Infof("mgo error: %s", mgoErr)
 		result.Error = fmt.Sprintf("mgo error: %s", mgoErr)
 		result.Entries = []Entry{}
 		result.Count = 0

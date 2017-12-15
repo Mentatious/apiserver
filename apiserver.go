@@ -44,7 +44,7 @@ func main() {
 	rpcServer.RegisterCodec(json2.NewCodec(), "application/json;charset=UTF-8")
 
 	entryAPI := new(entry.Service)
-	entryAPI.Init(dbhost, log)
+	entryAPI.Init("entry", dbhost, log)
 	defer entryAPI.Destroy()
 
 	c := make(chan os.Signal, 2)
