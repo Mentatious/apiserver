@@ -312,7 +312,10 @@ func (s *Service) Search(r *http.Request, args *SearchEntryArgs, result *SearchR
 	}
 	searchClauses = append(searchClauses, bson.M{"$or": entryTypesClauses})
 	if args.Content != "" {
-		searchClauses = append(searchClauses, bson.M{"content": bson.M{"$regex": args.Content, "$options": "i"}})
+		var entryContentClauses []bson.M
+		entryContentClauses = append(entryContentClauses, bson.M{"content": bson.M{"$regex": args.Content, "$options": "i"}})
+		entryContentClauses = append(entryContentClauses, bson.M{"metadata.description": bson.M{"$regex": args.Content, "$options": "i"}})
+		searchClauses = append(searchClauses, bson.M{"$or": entryContentClauses})
 	}
 	if len(args.Tags) > 0 {
 		searchClauses = append(searchClauses, bson.M{"tags": bson.M{"$in": args.Tags}})
