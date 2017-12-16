@@ -132,7 +132,7 @@ type SearchEntryArgs struct {
 	Types    []string
 	Content  string
 	Tags     []string
-	Priority string
+	Priority []string
 }
 
 // SearchResponse ... JSON-RPC response for Search method

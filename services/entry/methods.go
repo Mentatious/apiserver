@@ -324,8 +324,8 @@ func (s *Service) Search(r *http.Request, args *SearchEntryArgs, result *SearchR
 		}
 		searchClauses = append(searchClauses, bson.M{"tags": bson.M{"$in": regexTags}})
 	}
-	if args.Priority != "" {
-		searchClauses = append(searchClauses, bson.M{"priority": args.Priority})
+	if len(args.Priority) > 0 {
+		searchClauses = append(searchClauses, bson.M{"priority": bson.M{"$in": args.Priority}})
 	}
 	coll := s.Session.DB(MentatDatabase).C(args.UserID)
 	if len(searchClauses) > 0 {
