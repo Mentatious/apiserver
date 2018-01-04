@@ -1,8 +1,9 @@
 package entry
 
 import (
-	"github.com/Mentatious/mentat-apiserver/services"
 	"time"
+
+	"github.com/Mentatious/mentat-apiserver/services"
 )
 
 // TODO: move [some of these] to config storage (file/whatever)

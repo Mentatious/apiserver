@@ -2,9 +2,10 @@ package services
 
 import (
 	"fmt"
+	"os"
+
 	"go.uber.org/zap"
 	"gopkg.in/mgo.v2"
-	"os"
 )
 
 // BaseService ... basic RPC service definition

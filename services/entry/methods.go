@@ -2,12 +2,13 @@ package entry
 
 import (
 	"fmt"
-	"github.com/satori/go.uuid"
-	"gopkg.in/mgo.v2/bson"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/satori/go.uuid"
+	"gopkg.in/mgo.v2/bson"
 )
 
 const (
