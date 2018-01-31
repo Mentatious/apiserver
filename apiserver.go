@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/Mentatious/mentat-apiserver/services/entry"
 	"github.com/gorilla/mux"
@@ -45,14 +43,7 @@ func main() {
 	entryAPI.Init("entry", *DBHost, log)
 	defer entryAPI.Destroy()
 
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		entryAPI.Destroy()
-		fmt.Println("Caught ^C, exiting...")
-		os.Exit(1)
-	}()
+	goodies.HandleKeyboardInterrupt()
 
 	rpcServer.RegisterService(entryAPI, "entry")
 
